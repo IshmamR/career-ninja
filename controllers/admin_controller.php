@@ -22,9 +22,7 @@ function loginAdmin()
   $hashed = hashPassword($password);
 
   $sql = "SELECT * FROM 'admins' WHERE username = '$username' AND password = '$hashed';";
-
   $result = $conn->query($sql);
-
 
   if ($result->num_rows == 0) {
     http_response_code(404);
@@ -50,7 +48,7 @@ function loginAdmin()
   exit;
 }
 
-function logout()
+function logoutAdmin()
 {
   global $ADMIN_COOKIE_KEY;
   header('Content-Type: application/json; charset=utf-8');
