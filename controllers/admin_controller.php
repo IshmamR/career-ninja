@@ -1,18 +1,18 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 'on');
-
 
 require_once(__DIR__ . '/../db/conn.php');
 require_once(__DIR__ . '/../utils/hash.php');
+require_once(__DIR__ . '/../env.php');
 
 function loginAdmin()
 {
-  global $conn;
+  global $conn, $CIPHER_ALGO, $ADMIN_ENCR, $ADMIN_COOKIE_KEY;
   header('Content-Type: application/json; charset=utf-8');
 
-  $username = $_POST['username'];
-  $password = $_POST['password'];
+  // receive posted json body
+  $data = json_decode(file_get_contents('php://input'), true);
+  $username = $data['username'];
+  $password = $data['password'];
   if (empty($username) || empty($password)) {
     http_response_code(400);
     echo json_encode(["error" => "username and password are required"]);
@@ -22,9 +22,7 @@ function loginAdmin()
   $hashed = hashPassword($password);
 
   $sql = "SELECT * FROM 'admins' WHERE username = '$username' AND password = '$hashed';";
-
   $result = $conn->query($sql);
-
 
   if ($result->num_rows == 0) {
     http_response_code(404);
@@ -43,17 +41,18 @@ function loginAdmin()
   ];
 
   $authAdmin = json_encode($admin);
-
-  setcookie("@admin_auth_cookie", $authAdmin, time() + (86400 * 30), '/'); // 1 day
+  $admin_token = openssl_encrypt($authAdmin, $CIPHER_ALGO, $ADMIN_ENCR);
+  setcookie($ADMIN_COOKIE_KEY, $admin_token, time() + (86400 * 30), '/'); // 1 day
 
   echo $authAdmin;
   exit;
 }
 
-function logout()
+function logoutAdmin()
 {
+  global $ADMIN_COOKIE_KEY;
   header('Content-Type: application/json; charset=utf-8');
-  unset($_COOKIE['@admin_auth_cookie']);
+  unset($_COOKIE[$ADMIN_COOKIE_KEY]);
 
   http_response_code(200);
   echo json_encode(["message" => "logged out"]);
