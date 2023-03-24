@@ -1,8 +1,8 @@
 <?php
 
-require_once(__DIR__ . "/../env.php");
+require_once(__DIR__ . "/../config.php");
 
-$conn = new mysqli($MYSQL_HOST, $MYSQL_USER, $MYSQL_PASS, $MYSQL_DTBS);
+$conn = new mysqli($MYSQL_HOST, $MYSQL_USER, $MYSQL_PASS, $MYSQL_DTBS, $MYSQL_PORT);
 
 // Check connection
 if ($conn->connect_errno) {
