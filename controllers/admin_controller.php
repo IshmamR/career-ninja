@@ -2,13 +2,13 @@
 
 require_once(__DIR__ . '/../db/conn.php');
 require_once(__DIR__ . '/../utils/hash.php');
-require_once(__DIR__ . '/../env.php');
 
 function adminTestFunc()
 {
+  global $conn;
   header('Content-Type: application/json; charset=utf-8');
   http_response_code(200);
-  echo json_encode(["message" => "Should you be here? :/"], JSON_UNESCAPED_SLASHES);
+  echo json_encode(["message" => $conn->host_info], JSON_UNESCAPED_SLASHES);
   exit;
 }
 
@@ -18,9 +18,11 @@ function createAdmin()
   header('Content-Type: application/json; charset=utf-8');
 
   $data = json_decode(file_get_contents('php://input'), true);
+
   $username = $data['username'];
   $password = $data['password'];
   $confirmPassword = $data['confirmPassword'];
+
   if (empty($username) || empty($password) || empty($confirmPassword)) {
     http_response_code(400);
     echo json_encode(["message" => "please fill up all required fields"], JSON_UNESCAPED_SLASHES);
@@ -33,15 +35,17 @@ function createAdmin()
     exit;
   }
 
+  $good_username = mysqli_real_escape_string($conn, $username);
+  $good_password = mysqli_real_escape_string($conn, $password);
 
   $uniqueId = generateRandomUniqueId('@admin_'); // random 36 byte string
-  $hashed = hashPassword($password);
+  $hashed = hashPassword($good_password);
 
   $sql = "INSERT INTO `admin` 
     (`id`, `username`, `password`, `type`) 
-    VALUES ('$uniqueId', '$username', '$hashed', 'SECONDARY_ADMIN')
+    VALUES ('$uniqueId', '$good_username', '$hashed', 'SECONDARY_ADMIN')
   ;";
-  $result = $conn->query($sql);
+  $result = mysqli_query($conn, $sql);
 
   if ($result === TRUE) {
     http_response_code(201);
@@ -69,20 +73,25 @@ function loginAdmin()
     exit;
   }
 
-  $hashed = hashPassword($password);
+  $good_username = $conn->real_escape_string($username);
+  $good_password = $conn->real_escape_string($password);
 
-  $sql = "SELECT * FROM 'admins' WHERE username = '$username' AND password = '$hashed';";
+  $sql = "SELECT * FROM admins WHERE username='$good_username';";
   $result = $conn->query($sql);
 
   if ($result->num_rows == 0) {
     http_response_code(404);
-    echo json_encode(["error" => "admin not found"], JSON_UNESCAPED_SLASHES);
+    echo json_encode(["message" => $good_username], JSON_UNESCAPED_SLASHES);
     exit;
   }
 
-  http_response_code(200);
-
   $row = $result->fetch_assoc();
+
+  if (!password_verify($good_password, $row['password'])) {
+    http_response_code(404);
+    echo json_encode(["message" => "username and password did not match"], JSON_UNESCAPED_SLASHES);
+    exit;
+  }
 
   $admin = [
     "id" => $row['id'],
@@ -94,6 +103,7 @@ function loginAdmin()
   $admin_token = openssl_encrypt($authAdmin, $CIPHER_ALGO, $ADMIN_ENCR);
   setcookie($ADMIN_COOKIE_KEY, $admin_token, time() + (86400 * 30), '/'); // 1 day
 
+  http_response_code(200);
   echo $authAdmin;
   exit;
 }
