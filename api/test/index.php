@@ -1,13 +1,12 @@
 <?php
 
+require_once(__DIR__ . "/../../utils/hash.php");
+
 if ($_SERVER["REQUEST_METHOD"] == "GET") {
-  $bytes = openssl_random_pseudo_bytes(10);
-  echo $bytes;
+  $id = generateRandomUniqueId('@admin_');
+  echo $id;
   echo "<br />";
-  $hex = bin2hex($bytes);
-  echo $hex;
-  echo "<br />";
-  echo strlen($hex);
-  echo "<br />";
-  echo $bytes . $hex;
+
+  $pass = hashPassword("admin1234");
+  echo $pass;
 }
