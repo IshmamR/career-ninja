@@ -26,7 +26,7 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-  echo $_SERVER["REQUEST_METHOD"];
+  echo json_encode($_SERVER["REQUEST_METHOD"], true);
   exit;
   // loginAdmin();
 }
