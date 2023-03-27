@@ -28,7 +28,7 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
   adminTestFunc();
 }
 
-if (isset($_POST['username']) && isset($_POST['password'])) {
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
   header('Content-Type: application/json; charset=utf-8');
   http_response_code(200);
   echo json_encode(["REQUEST_METHOD" => "POST"], JSON_UNESCAPED_SLASHES);
