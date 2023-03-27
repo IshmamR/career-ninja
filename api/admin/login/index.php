@@ -26,7 +26,9 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-  echo json_encode($_SERVER["REQUEST_METHOD"], true);
+  header('Content-Type: application/json; charset=utf-8');
+  http_response_code(200);
+  echo json_encode(["REQUEST_METHOD" => "POST"], JSON_UNESCAPED_SLASHES);
   exit;
   // loginAdmin();
 }
