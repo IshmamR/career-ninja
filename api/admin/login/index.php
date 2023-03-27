@@ -1,7 +1,5 @@
 <?php
 
-require_once(__DIR__ . '/../../../controllers/admin_controller.php');
-
 // Allow from any origin
 if (isset($_SERVER['HTTP_ORIGIN'])) {
   header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
@@ -20,10 +18,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
   exit(0);
 }
 
+require_once(__DIR__ . '/../../../controllers/admin_controller.php');
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-  header("Access-Control-Allow-Origin: *");
-  header("Access-Control-Allow-Headers: *");
-  // header("Content-Type: application/json; charset=utf-8");
+  header("Content-Type: application/json; charset=utf-8");
   http_response_code(200);
   echo json_encode(["REQUEST_METHOD" => "POST", 'a' => 'b'], JSON_UNESCAPED_SLASHES);
   exit;
@@ -31,7 +29,5 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "GET") {
-  header("Access-Control-Allow-Origin: *");
-  header("Access-Control-Allow-Headers: *");
   adminTestFunc();
 }
