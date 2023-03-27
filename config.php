@@ -1,5 +1,9 @@
 <?php
 
+echo $_SERVER['DOCUMENT_ROOT'];
+echo " \n ";
+echo __DIR__;
+
 $env = parse_ini_file($_SERVER['DOCUMENT_ROOT'] . '/.env') or $_ENV;
 
 $MYSQL_HOST = $env['MYSQL_HOST'];
