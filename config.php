@@ -4,7 +4,7 @@ echo $_SERVER['DOCUMENT_ROOT'];
 echo " \n ";
 echo __DIR__;
 echo "<br />";
-echo $_ENV;
+echo $_ENV['MYSQL_HOST'];
 
 $env = parse_ini_file($_SERVER['DOCUMENT_ROOT'] . '/.env') or $_ENV;
 
