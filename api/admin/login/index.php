@@ -25,7 +25,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
   header("Access-Control-Allow-Headers: *");
   // header("Content-Type: application/json; charset=utf-8");
   http_response_code(200);
-  echo json_encode(["REQUEST_METHOD" => "POST"], JSON_UNESCAPED_SLASHES);
+  echo json_encode(["REQUEST_METHOD" => "POST", 'a' => 'b'], JSON_UNESCAPED_SLASHES);
   exit;
   // loginAdmin();
 }
@@ -35,4 +35,3 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
   header("Access-Control-Allow-Headers: *");
   adminTestFunc();
 }
-
