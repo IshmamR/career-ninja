@@ -1,6 +1,6 @@
 <?php
 
-$env = parse_ini_file('.env') or $_ENV;
+$env = parse_ini_file($_SERVER['DOCUMENT_ROOT'] . '/.env') or $_ENV;
 
 $MYSQL_HOST = $env['MYSQL_HOST'];
 $MYSQL_PORT = $env['MYSQL_PORT'];
