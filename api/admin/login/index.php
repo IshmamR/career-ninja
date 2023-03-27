@@ -26,5 +26,7 @@ if ($_SERVER["REQUEST_METHOD"] == "GET") {
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-  loginAdmin();
+  echo $_SERVER["REQUEST_METHOD"];
+  exit;
+  // loginAdmin();
 }
