@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-  echo $_POST['username'];
+  $data = json_decode(file_get_contents('php://input'), true);
+  echo $data['username'];
   exit;
 }

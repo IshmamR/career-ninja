@@ -64,9 +64,10 @@ function loginAdmin()
   header('Content-Type: application/json; charset=utf-8');
 
   // receive posted json body
-  $data = json_decode(file_get_contents('php://input'), true);
-  $username = $data['username'];
-  $password = $data['password'];
+  // $data = json_decode(file_get_contents('php://input'), true);
+
+  $username = $_POST['username'];
+  $password = $_POST['password'];
   if (empty($username) || empty($password)) {
     http_response_code(400);
     echo json_encode(["error" => "username and password are required"], JSON_UNESCAPED_SLASHES);
