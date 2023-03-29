@@ -1,10 +1,10 @@
 <?php
 
-require_once(__DIR__ . '/../../../controllers/admin_controller.php');
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Headers: *");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE, PATCH");
 
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST');
-header("Access-Control-Allow-Headers: X-Requested-With");
+require_once(__DIR__ . '/../../../controllers/admin_controller.php');
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
   logoutAdmin();

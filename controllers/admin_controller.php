@@ -41,7 +41,7 @@ function createAdmin()
   $uniqueId = generateRandomUniqueId('@admin_'); // random 36 byte string
   $hashed = hashPassword($good_password);
 
-  $sql = "INSERT INTO `admin` 
+  $sql = "INSERT INTO `admins` 
     (`id`, `username`, `password`, `type`) 
     VALUES ('$uniqueId', '$good_username', '$hashed', 'SECONDARY_ADMIN')
   ;";
@@ -64,20 +64,20 @@ function loginAdmin()
   header('Content-Type: application/json; charset=utf-8');
 
   // receive posted json body
-  // $data = json_decode(file_get_contents('php://input'), true);
+  $data = json_decode(file_get_contents('php://input'), true);
 
-  $username = $_POST['username'];
-  $password = $_POST['password'];
+  $username = $data['username'];
+  $password = $data['password'];
   if (empty($username) || empty($password)) {
     http_response_code(400);
-    echo json_encode(["error" => "username and password are required"], JSON_UNESCAPED_SLASHES);
+    echo json_encode(["message" => "username and password are required"], JSON_UNESCAPED_SLASHES);
     exit;
   }
 
   $good_username = $conn->real_escape_string($username);
   $good_password = $conn->real_escape_string($password);
 
-  $sql = "SELECT * FROM admins WHERE username='$good_username';";
+  $sql = "SELECT * FROM `admins` WHERE username='$good_username';";
   $result = $conn->query($sql);
 
   if ($result->num_rows == 0) {
@@ -117,5 +117,12 @@ function logoutAdmin()
 
   http_response_code(200);
   echo json_encode(["message" => "logged out"], JSON_UNESCAPED_SLASHES);
+  exit;
+}
+
+function testLoggedAdmin()
+{
+  http_response_code(200);
+  echo json_encode(["message" => "Authenticated"], JSON_UNESCAPED_SLASHES);
   exit;
 }
