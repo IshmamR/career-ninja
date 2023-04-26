@@ -7,6 +7,7 @@ use Slim\Factory\AppFactory;
 
 require __DIR__ . '/../vendor/autoload.php';
 require __DIR__ . '/../config/db.php';
+require __DIR__ . '/../utils/hash.php';
 
 $app = AppFactory::create();
 
@@ -27,13 +28,17 @@ $app->add(function ($request, $handler) {
 });
 
 $app->get('/', function (Request $request, Response $response) {
-  $response->getBody()->write("PONG");
+  $params = $request->getQueryParams();
+  $response->getBody()->write($params["id"]);
   return $response->withHeader("Content-Type", "application/json")->withStatus(200);
 });
 
 require __DIR__ . '/../routes/test.php';
-require __DIR__ . '/../routes/new_test.php';
+//
 require __DIR__ . '/../routes/admin.php';
+require __DIR__ . '/../routes/company.php';
+require __DIR__ . '/../routes/circular.php';
+require __DIR__ . '/../routes/field.php';
 
 $app->map(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], '/{routes:.+}', function ($request, $response) {
   throw new HttpNotFoundException($request);
