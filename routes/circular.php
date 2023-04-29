@@ -76,10 +76,13 @@ $app->get("/circular/all", function (Request $request, Response $response) {
 
 $app->post("/circular/add", function (Request $request, Response $response) {
   try {
+    $authCompanyAdmin = $request->getAttribute('authCompanyAdmin');
+    $companyId = $authCompanyAdmin->companyId;
+
     $json = $request->getBody();
     $body = json_decode($json, true);
 
-    if (empty($body['companyId']) || empty($body['fieldId'])) {
+    if (empty($body['fieldId'])) {
       $response->getBody()->write(json_encode(["message" => "Please fill up all required fields"]));
       return $response->withStatus(400);
     }
@@ -101,7 +104,7 @@ $app->post("/circular/add", function (Request $request, Response $response) {
     $isActive = TRUE;
 
     $stmt->bindParam(':id', $circularId);
-    $stmt->bindParam(':companyId', htmlspecialchars(strip_tags($body['companyId'])));
+    $stmt->bindParam(':companyId', $companyId);
     $stmt->bindParam(':fieldId', htmlspecialchars(strip_tags($body['fieldId'])));
     $stmt->bindParam(':title', htmlspecialchars(strip_tags($body['title'])));
     $stmt->bindParam(':description', htmlspecialchars(strip_tags($body['description'])));
@@ -139,6 +142,8 @@ $app->post("/circular/add", function (Request $request, Response $response) {
     $response->getBody()->write(json_encode($error));
     return $response->withStatus(500);
   }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "company");
 });
 
 $app->put("/circular/update/{id}", function (Request $request, Response $response, array $args) {
@@ -204,6 +209,8 @@ $app->put("/circular/update/{id}", function (Request $request, Response $respons
     $response->getBody()->write(json_encode($error));
     return $response->withStatus(500);
   }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "company");
 });
 
 $app->put("/circular/toggle-active/{id}", function (Request $request, Response $response, array $args) {
@@ -245,6 +252,8 @@ $app->put("/circular/toggle-active/{id}", function (Request $request, Response $
     $response->getBody()->write(json_encode($error));
     return $response->withStatus(500);
   }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "company");
 });
 
 $app->delete("/circular/{id}", function (Request $request, Response $response, array $args) {
@@ -280,4 +289,6 @@ $app->delete("/circular/{id}", function (Request $request, Response $response, a
     $response->getBody()->write(json_encode($error));
     return $response->withStatus(500);
   }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "admin");
 });

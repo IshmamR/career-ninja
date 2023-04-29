@@ -42,8 +42,8 @@ $app->post("/company/signup", function (Request $request, Response $response) {
       return $response->withStatus(400);
     }
 
-    $companyData = $body["company"];
-    $companyAdminData = $body["companyAdmin"];
+    $companyData = json_decode($body["company"], true);
+    $companyAdminData = json_decode($body["companyAdmin"], true);
 
     $db = new Database();
     $conn = $db->connect();
@@ -60,7 +60,6 @@ $app->post("/company/signup", function (Request $request, Response $response) {
     }
 
     $logo = '/static/companies/__demo__.png';
-    $verified = FALSE;
     $companyId = generateRandomUniqueId("@cmpany");
 
     // get file
@@ -69,27 +68,26 @@ $app->post("/company/signup", function (Request $request, Response $response) {
     if (isset($imageUploaded)) {
       $mediaType = $imageUploaded->getClientMediaType();
       $extension = substr($mediaType, 6);
-      $logo = "/static/companies/" . $companyId . "." .  $extension;
+      $logo = "/static/companies/" . substr($companyId, 1) . "." .  $extension;
       $path = __DIR__ . "/../public" . $logo;
       $imageUploaded->moveTo($path);
     }
 
     $sql = "INSERT INTO `companies` 
       (`id`, `title`, `description`, `logo`, `email`, `contact`, `website`, `country`, `city`, `verified`)
-      VALUES (:id, :title, :description, :logo, :email, :contact, :website, :country, :city, :verified);";
+      VALUES (:id, :title, :description, :logo, :email, :contact, :website, :country, :city, FALSE);";
 
     $stmt = $conn->prepare($sql);
 
-    $stmt->bindParam(':id', $companyId);
-    $stmt->bindParam(':title', htmlspecialchars(strip_tags($companyData["title"])));
-    $stmt->bindParam(':description', htmlspecialchars(strip_tags($companyData["description"])));
-    $stmt->bindParam(':logo', htmlspecialchars(strip_tags($logo)));
-    $stmt->bindParam(':email', htmlspecialchars(strip_tags($companyData["email"])));
-    $stmt->bindParam(':contact', htmlspecialchars(strip_tags($companyData["contact"])));
-    $stmt->bindParam(':website', htmlspecialchars(strip_tags($companyData["website"])));
-    $stmt->bindParam(':country', htmlspecialchars(strip_tags($companyData["country"])));
-    $stmt->bindParam(':city', htmlspecialchars(strip_tags($companyData["city"])));
-    $stmt->bindParam(':verified', $verified);
+    $stmt->bindValue(':id', $companyId);
+    $stmt->bindValue(':title', htmlspecialchars(strip_tags($companyData["title"])));
+    $stmt->bindValue(':description', htmlspecialchars(strip_tags($companyData["description"])));
+    $stmt->bindValue(':logo', htmlspecialchars(strip_tags($logo)));
+    $stmt->bindValue(':email', htmlspecialchars(strip_tags($companyData["email"])));
+    $stmt->bindValue(':contact', htmlspecialchars(strip_tags($companyData["contact"])));
+    $stmt->bindValue(':website', htmlspecialchars(strip_tags($companyData["website"])));
+    $stmt->bindValue(':country', htmlspecialchars(strip_tags($companyData["country"])));
+    $stmt->bindValue(':city', htmlspecialchars(strip_tags($companyData["city"])));
 
     $result = $stmt->execute();
 
@@ -99,7 +97,7 @@ $app->post("/company/signup", function (Request $request, Response $response) {
     }
 
     // create a company admin
-    $sql = "INSERT INTO `companies` (`companyId`, `username`, `password`)
+    $sql = "INSERT INTO `company_admins` (`companyId`, `username`, `password`)
       VALUES (:companyId, :username, :password);";
 
     $stmt = $conn->prepare($sql);
@@ -153,19 +151,25 @@ $app->post("/company/login", function (Request $request, Response $response) {
     $db = new Database();
     $conn = $db->connect();
 
-    $query = "SELECT * FROM `company_admins` WHERE username = :username AND verified = TRUE;";
+    $query = "SELECT c.id, c.title, c.verified, ca.username, ca.password
+      FROM companies c
+      JOIN company_admins ca ON ca.companyId = c.id
+      WHERE ca.username = :username
+        AND c.verified = 1;";
     $stmt = $conn->prepare($query);
-    $stmt->bindParam(':username', htmlspecialchars(strip_tags($data['username'])));
+    $stmt->bindValue(':username', htmlspecialchars(strip_tags($data['username'])));
     $stmt->execute();
+
     $result = $stmt->fetch(PDO::FETCH_OBJ);
 
     // clean var
     $db = null;
 
     if (!$result) {
-      $response->getBody()->write(json_encode(["message" => "username or password did not match"]));
+      $response->getBody()->write(json_encode(["message" => "company not verified"]));
       return $response->withStatus(400);
     }
+
 
     $verified = password_verify($data["password"], $result->password);
     if (!$verified) {
@@ -174,7 +178,7 @@ $app->post("/company/login", function (Request $request, Response $response) {
     }
 
     $companyAdmin = [
-      "companyId" => $result->companyId,
+      "companyId" => $result->id,
       "username" => $result->username,
     ];
     $authAdmin = json_encode($companyAdmin);
@@ -196,16 +200,17 @@ $app->post("/company/login", function (Request $request, Response $response) {
 /**
  * get profile
  */
-$app->get("/company/profile/{id}", function (Request $request, Response $response, array $args) {
+$app->get("/company/profile", function (Request $request, Response $response) {
   try {
-    $companyId = $args['id'];
+    $authCompanyAdmin = $request->getAttribute('authCompanyAdmin');
+    $companyId = $authCompanyAdmin->companyId;
 
     $db = new Database();
     $conn = $db->connect();
 
-    $sql = "SELECT * FROM `companies` WHERE companyId = :companyId";
+    $sql = "SELECT * FROM `companies` WHERE id = :id";
     $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':companyId', htmlspecialchars(strip_tags($companyId)));
+    $stmt->bindParam(':id', htmlspecialchars(strip_tags($companyId)));
     $stmt->execute();
     $result = $stmt->fetch(PDO::FETCH_OBJ);
     if (!$result) {
@@ -225,6 +230,178 @@ $app->get("/company/profile/{id}", function (Request $request, Response $respons
 })->add(function ($req, $handler) use ($authMiddleware) {
   return $authMiddleware($req, $handler, "company");
 });
+
+/**
+ * update company logo
+ */
+$app->put("/company/logo", function (Request $request, Response $response) {
+  try {
+    $authCompanyAdmin = $request->getAttribute('authCompanyAdmin');
+    $companyId = $authCompanyAdmin->companyId;
+
+    $db = new Database();
+    $conn = $db->connect();
+
+    $sql = "SELECT * FROM `companies` WHERE id = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $companyId);
+    $stmt->execute();
+    $result = $stmt->fetch(PDO::FETCH_OBJ);
+
+    if (!$result) {
+      $response->getBody()->write(json_encode(["message" => "Company not found"]));
+      return $response->withStatus(404);
+    }
+
+    // get file
+    $files = $request->getUploadedFiles();
+    $imageUploaded = $files["image"];
+
+    if (!isset($imageUploaded)) {
+      $response->getBody()->write(json_encode(["message" => "Image not found"]));
+      return $response->withStatus(400);
+    }
+
+    $mediaType = $imageUploaded->getClientMediaType();
+    $extension = substr($mediaType, 6);
+    $logo = "/static/companies/" . substr($companyId, 1) . "." .  $extension;
+    $path = __DIR__ . "/../public" . $logo;
+    $imageUploaded->moveTo($path);
+
+    $sql = "UPDATE `companies` SET logo = :logo WHERE `id` = :id;";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $companyId);
+    $stmt->bindParam(':logo', $logo);
+    $result = $stmt->execute();
+
+    if (!$result) {
+      $response->getBody()->write(json_encode(["message" => "Could not update logo"]));
+      return $response->withStatus(500);
+    }
+
+    $response->getBody()->write(json_encode(["message" => "Logo uploaded"]));
+    return $response->withStatus(200);
+  } catch (PDOException $err) {
+    $error = array(
+      "message" => $err->getMessage()
+    );
+    $response->getBody()->write(json_encode($error));
+    return $response->withStatus(500);
+  }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "company");
+});
+
+/**
+ * update company cover
+ */
+$app->put("/company/cover", function (Request $request, Response $response) {
+  try {
+    $authCompanyAdmin = $request->getAttribute('authCompanyAdmin');
+    $companyId = $authCompanyAdmin->companyId;
+
+    $db = new Database();
+    $conn = $db->connect();
+
+    $sql = "SELECT * FROM `companies` WHERE id = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $companyId);
+    $stmt->execute();
+    $result = $stmt->fetch(PDO::FETCH_OBJ);
+
+    if (!$result) {
+      $response->getBody()->write(json_encode(["message" => "Company not found"]));
+      return $response->withStatus(404);
+    }
+
+    // get file
+    $files = $request->getUploadedFiles();
+    $imageUploaded = $files["image"];
+
+    if (!isset($imageUploaded)) {
+      $response->getBody()->write(json_encode(["message" => "Image file not found"]));
+      return $response->withStatus(400);
+    }
+
+    $mediaType = $imageUploaded->getClientMediaType();
+    $extension = substr($mediaType, 6);
+    $cover = "/static/companies/covers/" . substr($companyId, 1) . "." .  $extension;
+    $path = __DIR__ . "/../public" . $cover;
+    $imageUploaded->moveTo($path);
+
+    $sql = "UPDATE `companies` SET cover = :cover WHERE `id` = :id;";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $companyId);
+    $stmt->bindParam(':cover', $cover);
+    $result = $stmt->execute();
+
+    if (!$result) {
+      $response->getBody()->write(json_encode(["message" => "Could not update cover"]));
+      return $response->withStatus(500);
+    }
+
+    $response->getBody()->write(json_encode(["message" => "Company cover uploaded"]));
+    return $response->withStatus(200);
+  } catch (PDOException $err) {
+    $error = array(
+      "message" => $err->getMessage()
+    );
+    $response->getBody()->write(json_encode($error));
+    return $response->withStatus(500);
+  }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "company");
+});
+
+/**
+ * Update company information
+ */
+$app->put("/company/update", function (Request $request, Response $response) {
+  try {
+    $authCompanyAdmin = $request->getAttribute('authCompanyAdmin');
+    $companyId = $authCompanyAdmin->companyId;
+
+    $json = $request->getBody();
+    $data = json_decode($json, true);
+
+    $db = new Database();
+    $conn = $db->connect();
+
+    // Build the SQL query and the list of parameters
+    $params = [];
+    $sql = "UPDATE companies SET ";
+    foreach ($data as $key => $value) {
+      $sql .= "`{$key}` = :{$key}, ";
+      $params[":{$key}"] = $value;
+    }
+    $sql = rtrim($sql, ", ");
+    $sql .= " WHERE id = :companyId";
+    $params[":companyId"] = $companyId;
+
+    // Prepare and execute the query
+    $stmt = $conn->prepare($sql);
+    $stmt->execute($params);
+
+    $stmt->debugDumpParams();
+
+    if ($stmt->rowCount() === 0) {
+      $response->getBody()->write(json_encode(["message" => "No records were updated"]));
+      return $response->withStatus(200);
+    }
+
+    $response->getBody()->write(json_encode(["message" => "Company profile updated successfully"]));
+    return $response->withStatus(200);
+  } catch (PDOException $err) {
+    $error = array(
+      "message" => $err->getMessage()
+    );
+    $response->getBody()->write(json_encode($error));
+    return $response->withStatus(500);
+  }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "company");
+});
+
 
 /**
  * logout
@@ -290,13 +467,16 @@ $app->get("/company/all", function (Request $request, Response $response) {
 /**
  * verify a company
  */
-$app->put("/company/verify", function (Request $req, Response $response) {
+$app->put("/company/verify/{id}", function (Request $req, Response $response, array $args) {
   try {
+    $companyId = $args["id"];
+
     $db = new Database();
     $conn = $db->connect();
 
-    $sql = "UPDATE `companies` SET verified = TRUE;";
+    $sql = "UPDATE `companies` SET verified = TRUE WHERE `id` = :id;";
     $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', htmlspecialchars(strip_tags($companyId)));
     $result = $stmt->execute();
 
     if (!$result) {
@@ -332,6 +512,9 @@ $app->get("/company/get/{id}", function (Request $request, Response $response, a
     $stmt->bindParam(':companyId', htmlspecialchars(strip_tags($companyId)));
     $stmt->execute();
     $result = $stmt->fetch(PDO::FETCH_OBJ);
+
+    $db = null;
+
     if (!$result) {
       $response->getBody()->write(json_encode(["message" => "company does not exist"]));
       return $response->withStatus(404);
@@ -388,4 +571,41 @@ $app->delete("/company/{id}", function (Request $request, Response $response, ar
   }
 })->add(function ($req, $handler) use ($authMiddleware) {
   return $authMiddleware($req, $handler, "admin");
+});
+
+#########################
+# BELOW ARE PUBLIC APIs #
+#########################
+
+$app->get("/company/{id}", function (Request $request, Response $response, array $args) {
+  try {
+    $companyId = $args['id'];
+
+    $db = new Database();
+    $conn = $db->connect();
+
+    $sql = "SELECT c.id, c.title, c.description, c.logo, c.cover, c.email, c.contact,
+      c.website, c.country, c.city, c.address
+     FROM companies as c WHERE id = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', htmlspecialchars(strip_tags($companyId)));
+    $stmt->execute();
+    $result = $stmt->fetch(PDO::FETCH_OBJ);
+
+    $db = null;
+
+    if (!$result) {
+      $response->getBody()->write(json_encode(["message" => "company does not exist"]));
+      return $response->withStatus(404);
+    }
+
+    $response->getBody()->write(json_encode($result));
+    return $response->withStatus(200);
+  } catch (PDOException $err) {
+    $error = array(
+      "message" => $err->getMessage()
+    );
+    $response->getBody()->write(json_encode($error));
+    return $response->withStatus(500);
+  }
 });
