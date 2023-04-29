@@ -77,39 +77,60 @@ $app->get("/circular/all", function (Request $request, Response $response) {
 $app->post("/circular/add", function (Request $request, Response $response) {
   try {
     $json = $request->getBody();
-    $data = json_decode($json, true);
+    $body = json_decode($json, true);
 
-    if (empty($data['title'])) {
-      $response->getBody()->write(json_encode(["message" => "field title is required"]));
+    if (empty($body['companyId']) || empty($body['fieldId'])) {
+      $response->getBody()->write(json_encode(["message" => "Please fill up all required fields"]));
       return $response->withStatus(400);
     }
-
-    $fieldId = generateRandomUniqueId("@fields");
-    $fieldTitle = htmlspecialchars(strip_tags($data["title"]));
 
     $db = new Database();
     $conn = $db->connect();
 
-    $sql = "INSERT INTO `fields` (`id`, `title`) VALUES (:id, :title);";
+    $sql = "INSERT INTO `circulars` (
+      `id`, `companyId`, `fieldId`, `title`, `description`, `vacancy`, `location`, `jobType`,
+      `salaryRangeStart`, `salaryRangeEnd`, `isSalaryNegotiable`, `isActive`, `externalLink`
+    ) VALUES (
+      :id, :companyId, :fieldId, :title, :description, :vacancy, :location, :jobType,
+      :salaryRangeStart, :salaryRangeEnd, :isSalaryNegotiable, :isActive, :externalLink
+    )";
 
     $stmt = $conn->prepare($sql);
 
-    $stmt->bindParam(':id', $fieldId);
-    $stmt->bindParam(':title', $fieldTitle);
+    $circularId = generateRandomUniqueId("@crclar");
+    $isActive = TRUE;
+
+    $stmt->bindParam(':id', $circularId);
+    $stmt->bindParam(':companyId', htmlspecialchars(strip_tags($body['companyId'])));
+    $stmt->bindParam(':fieldId', htmlspecialchars(strip_tags($body['fieldId'])));
+    $stmt->bindParam(':title', htmlspecialchars(strip_tags($body['title'])));
+    $stmt->bindParam(':description', htmlspecialchars(strip_tags($body['description'])));
+    $stmt->bindParam(':vacancy', htmlspecialchars(strip_tags($body['vacancy'])));
+    $stmt->bindParam(':location', htmlspecialchars(strip_tags($body['location'])));
+    $stmt->bindParam(':jobType', htmlspecialchars(strip_tags($body['jobType'])));
+    $stmt->bindParam(':salaryRangeStart', htmlspecialchars(strip_tags($body['salaryRangeStart'])));
+    $stmt->bindParam(':salaryRangeEnd', htmlspecialchars(strip_tags($body['salaryRangeEnd'])));
+    $stmt->bindParam(':isSalaryNegotiable', htmlspecialchars(strip_tags($body['isSalaryNegotiable'])));
+    $stmt->bindParam(':isActive', $isActive);
+    $stmt->bindParam(':externalLink', htmlspecialchars(strip_tags($body['externalLink'])));
 
     $result = $stmt->execute();
 
     if (!$result) {
-      $response->getBody()->write(json_encode(["message" => "Could not create field"]));
+      $response->getBody()->write(json_encode(["message" => "failed to create circular"]));
       return $response->withStatus(500);
     }
 
+    // fetch the inserted row's data
+    $sql = "SELECT * FROM `circulars` WHERE id = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $circularId);
+    $stmt->execute();
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
     $db = null;
 
-    $response->getBody()->write(json_encode([
-      "id" => $fieldId,
-      "title" => $fieldTitle
-    ]));
+    $response->getBody()->write(json_encode($row));
     return $response->withStatus(201);
   } catch (PDOException $err) {
     $error = array(
@@ -120,6 +141,111 @@ $app->post("/circular/add", function (Request $request, Response $response) {
   }
 });
 
+$app->put("/circular/update/{id}", function (Request $request, Response $response, array $args) {
+  try {
+    $circularId = $args['id'];
+
+    $json = $request->getBody();
+    $body = json_decode($json, true);
+
+    $db = new Database();
+    $conn = $db->connect();
+
+    // Define the base SQL query
+    $sql = "UPDATE `circulars` SET ";
+
+    // Initialize an array to store the bind parameters
+    $params = array();
+
+    // Loop through the fields that may be updated
+    $updateFields = array(
+      'companyId', 'fieldId', 'title', 'description', 'vacancy', 'location', 'jobType',
+      'salaryRangeStart', 'salaryRangeEnd', 'isSalaryNegotiable', 'externalLink'
+    );
+
+    foreach ($updateFields as $key) {
+      // Check if the field is present in the request body
+      if (isset($body[$key])) {
+        // Add the field to the SQL query and bind its value as a parameter
+        $sql .= "`$key` = :$key, ";
+        $params[":$key"] = htmlspecialchars(strip_tags($body[$key]));
+      }
+    }
+
+    // Check if any fields were updated
+    if (count($params) > 0) {
+      // Remove the trailing comma from the SQL query
+      $sql = rtrim($sql, ', ');
+
+      // Add the WHERE clause to specify the row to update
+      $sql .= " WHERE `id` = :id";
+      $params[':id'] = $circularId;
+
+      // Prepare and execute the SQL query
+      $stmt = $conn->prepare($sql);
+      $stmt->execute($params);
+    }
+
+    // fetch the inserted row's data
+    $sql = "SELECT * FROM `circulars` WHERE id = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $circularId);
+    $stmt->execute();
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $db = null;
+
+    $response->getBody()->write(json_encode($row));
+    return $response->withStatus(200);
+  } catch (PDOException $err) {
+    $error = array(
+      "message" => $err->getMessage()
+    );
+    $response->getBody()->write(json_encode($error));
+    return $response->withStatus(500);
+  }
+});
+
+$app->put("/circular/toggle-active/{id}", function (Request $request, Response $response, array $args) {
+  try {
+    $circularId = $args['id'];
+
+    $db = new Database();
+    $conn = $db->connect();
+
+    $sql = "SELECT `isActive` FROM `circulars` WHERE `id` = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $circularId);
+    $stmt->execute();
+    $isActive = $stmt->fetchColumn();
+
+    // Then, toggle the value and update the row
+    $newIsActive = !$isActive;
+    $sql = "UPDATE `circulars` SET `isActive` = :isActive WHERE `id` = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':isActive', $newIsActive);
+    $stmt->bindParam(':id', $circularId);
+    $stmt->execute();
+
+    // Fetch the updated row's data
+    $sql = "SELECT * FROM `circulars` WHERE `id` = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':id', $circularId);
+    $stmt->execute();
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $db = null;
+
+    $response->getBody()->write(json_encode($row));
+    return $response->withStatus(200);
+  } catch (PDOException $err) {
+    $error = array(
+      "message" => $err->getMessage()
+    );
+    $response->getBody()->write(json_encode($error));
+    return $response->withStatus(500);
+  }
+});
 
 $app->delete("/circular/{id}", function (Request $request, Response $response, array $args) {
   try {

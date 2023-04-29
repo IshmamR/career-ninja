@@ -9,7 +9,7 @@ $app->add(function ($request, $handler) {
   return $response->withHeader('Content-Type', 'application/json');
 });
 
-$app->get("/field/all", function (Request $request, Response $response) {
+$app->get("/skill/all", function (Request $request, Response $response) {
   try {
     $db = new Database();
     $conn = $db->connect();
@@ -22,7 +22,11 @@ $app->get("/field/all", function (Request $request, Response $response) {
     // Calculate the offset for the current page
     $offset = ($page - 1) * $limit;
 
-    $sql = "SELECT * FROM `fields` LIMIT :offset, :limit;";
+    $sql = "SELECT skills.*, fields.title AS field
+      FROM skills
+      JOIN fields ON skills.fieldId = fields.id 
+      LIMIT :offset, :limit;";
+
     $stmt = $conn->prepare($sql);
 
     // Bind the parameters
@@ -32,13 +36,13 @@ $app->get("/field/all", function (Request $request, Response $response) {
     $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_OBJ);
 
-    $total_items_sql = "SELECT COUNT(*) FROM `fields`;";
+    $total_items_sql = "SELECT COUNT(*) FROM `skills`;";
     $total_items = $conn->query($total_items_sql)->fetchColumn();
 
     $db = null;
 
     $response->getBody()->write(json_encode([
-      "fields" => $rows,
+      "skills" => $rows,
       "count" => $total_items
     ]));
     return $response->withStatus(200);
@@ -52,41 +56,58 @@ $app->get("/field/all", function (Request $request, Response $response) {
 });
 
 
-$app->post("/field/add", function (Request $request, Response $response) {
+$app->post("/skill/add", function (Request $request, Response $response) {
   try {
-    $json = $request->getBody();
-    $data = json_decode($json, true);
+    $body = $request->getParsedBody();
 
-    if (empty($data['title'])) {
-      $response->getBody()->write(json_encode(["message" => "field title is required"]));
+    if (empty($body['title']) || empty($body['fieldId'])) {
+      $response->getBody()->write(json_encode(["message" => "skill title is required"]));
       return $response->withStatus(400);
     }
 
-    $fieldId = generateRandomUniqueId("@fields");
-    $fieldTitle = htmlspecialchars(strip_tags($data["title"]));
+    $skillId = generateRandomUniqueId("@skills");
+    $skillTitle = htmlspecialchars(strip_tags($body["title"]));
+    $fieldId = htmlspecialchars(strip_tags($body['fieldId']));
+    $skillLogo = '/static/skills/__demo__.png';
+
+    // get file
+    $files = $request->getUploadedFiles();
+    $imageUploaded = $files["image"];
+    if (isset($imageUploaded)) {
+      $mediaType = $imageUploaded->getClientMediaType();
+      $extension = substr($mediaType, 6);
+      $skillLogo = "/static/skills/" . $skillId . "." .  $extension;
+      $path = __DIR__ . "/../public" . $skillLogo;
+      $imageUploaded->moveTo($path);
+    }
 
     $db = new Database();
     $conn = $db->connect();
 
-    $sql = "INSERT INTO `fields` (`id`, `title`) VALUES (:id, :title);";
+    $sql = "INSERT INTO `skills` (`id`, `fieldId`, `title`, `logo`) 
+      VALUES (:id, :fieldId, :title, :logo);";
 
     $stmt = $conn->prepare($sql);
 
-    $stmt->bindParam(':id', $fieldId);
-    $stmt->bindParam(':title', $fieldTitle);
+    $stmt->bindParam(':id', $skillId);
+    $stmt->bindParam(':fieldId', $fieldId);
+    $stmt->bindParam(':title', $skillTitle);
+    $stmt->bindParam(':logo', $skillLogo);
 
     $result = $stmt->execute();
 
     if (!$result) {
-      $response->getBody()->write(json_encode(["message" => "Could not create field"]));
+      $response->getBody()->write(json_encode(["message" => "Could not create skill"]));
       return $response->withStatus(500);
     }
 
     $db = null;
 
     $response->getBody()->write(json_encode([
-      "id" => $fieldId,
-      "title" => $fieldTitle
+      "id" => $skillId,
+      "fieldId" => $fieldId,
+      "title" => $skillTitle,
+      "logo" => $skillLogo
     ]));
     return $response->withStatus(201);
   } catch (PDOException $err) {
@@ -100,30 +121,31 @@ $app->post("/field/add", function (Request $request, Response $response) {
   return $authMiddleware($req, $handler, "admin");
 });
 
-$app->delete("/field/{id}", function (Request $request, Response $response, array $args) {
+
+$app->delete("/skill/{id}", function (Request $request, Response $response, array $args) {
   try {
-    $fieldId = $args['id'];
+    $skillId = $args['id'];
 
     $db = new Database();
     $conn = $db->connect();
 
-    $sql = "DELETE FROM `fields` WHERE id = :id;";
+    $sql = "DELETE FROM `skills` WHERE id = :id;";
 
     $stmt = $conn->prepare($sql);
 
-    $stmt->bindParam(':id', htmlspecialchars(strip_tags($fieldId)));
+    $stmt->bindParam(':id', htmlspecialchars(strip_tags($skillId)));
 
     $result = $stmt->execute();
 
     if (!$result) {
-      $response->getBody()->write(json_encode(["message" => "Could not delete field"]));
+      $response->getBody()->write(json_encode(["message" => "Could not delete skill"]));
       return $response->withStatus(500);
     }
 
     $db = null;
 
     $response->getBody()->write(json_encode([
-      "message" => "field deleted successfully",
+      "message" => "skill deleted successfully",
     ]));
     return $response->withStatus(200);
   } catch (PDOException $err) {

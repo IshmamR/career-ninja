@@ -49,7 +49,7 @@ $app->post('/admin/login', function (Request $request, Response $response) {
     $stmt->execute();
     $result = $stmt->fetch(PDO::FETCH_OBJ);
 
-    // clean var
+    // close connection
     $db = null;
 
     if (!$result) {
@@ -59,7 +59,7 @@ $app->post('/admin/login', function (Request $request, Response $response) {
 
     $verified = password_verify($data["password"], $result->password);
     if (!$verified) {
-      $response->getBody()->write(json_encode(["message" => "username or password did not match"]));
+      $response->getBody()->write(json_encode(["message" => "admin not verified"]));
       return $response->withStatus(400);
     }
 
@@ -72,7 +72,7 @@ $app->post('/admin/login', function (Request $request, Response $response) {
     $adminToken = openssl_encrypt($authAdmin, CIPHER_ALGO, ADMIN_ENCR);
     $response->getBody()->write(json_encode([
       "admin" => $admin,
-      "authToken" => $adminToken
+      "authAdminToken" => $adminToken
     ]));
     return $response->withStatus(200);
   } catch (PDOException $err) {

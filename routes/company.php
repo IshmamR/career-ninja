@@ -12,21 +12,38 @@ $app->add(function ($request, $handler) {
   return $response->withHeader('Content-Type', 'application/json');
 });
 
+$app->post("/company/upload/test", function (Request $req, Response $res) {
+  $files = $req->getUploadedFiles();
+  $imageUploaded = $files["image"];
+
+  $mediaType = $imageUploaded->getClientMediaType();
+
+  $extension = substr($mediaType, 6);
+
+  $route = "/static/test." .  $extension;
+  $path = __DIR__ . "/../public" . $route;
+  $imageUploaded->moveTo($path);
+
+  $body = $req->getParsedBody();
+
+  $res->getBody()->write(json_encode(["route" => $route, "body" => $body]));
+  return $res;
+});
+
 /**
  * Sign up company
  */
 $app->post("/company/signup", function (Request $request, Response $response) {
   try {
-    $json = $request->getBody();
-    $data = json_decode($json, true);
+    $body = $request->getParsedBody();
 
-    if (empty($data['company']) || empty($data['companyAdmin'])) {
+    if (empty($body['company']) || empty($body['companyAdmin'])) {
       $response->getBody()->write(json_encode(["message" => "please provide all required data"]));
       return $response->withStatus(400);
     }
 
-    $companyData = $data["company"];
-    $companyAdminData = $data["companyAdmin"];
+    $companyData = $body["company"];
+    $companyAdminData = $body["companyAdmin"];
 
     $db = new Database();
     $conn = $db->connect();
@@ -42,12 +59,20 @@ $app->post("/company/signup", function (Request $request, Response $response) {
       return $response->withStatus(400);
     }
 
-    // required company variables
-    $logo = $companyData['logo'] ?
-      $companyData['logo'] :
-      "https://ui-avatars.com/api/?name=" . $companyData['title'];
+    $logo = '/static/companies/__demo__.png';
     $verified = FALSE;
     $companyId = generateRandomUniqueId("@cmpany");
+
+    // get file
+    $files = $request->getUploadedFiles();
+    $imageUploaded = $files["image"];
+    if (isset($imageUploaded)) {
+      $mediaType = $imageUploaded->getClientMediaType();
+      $extension = substr($mediaType, 6);
+      $logo = "/static/companies/" . $companyId . "." .  $extension;
+      $path = __DIR__ . "/../public" . $logo;
+      $imageUploaded->moveTo($path);
+    }
 
     $sql = "INSERT INTO `companies` 
       (`id`, `title`, `description`, `logo`, `email`, `contact`, `website`, `country`, `city`, `verified`)
@@ -197,6 +222,8 @@ $app->get("/company/profile/{id}", function (Request $request, Response $respons
     $response->getBody()->write(json_encode($error));
     return $response->withStatus(500);
   }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "company");
 });
 
 /**
@@ -208,7 +235,11 @@ $app->put("/company/logout", function (Request $request, Response $response) {
 });
 
 
-// below are used by admin
+#################################
+# BELOW ARE USED BY ADMINS ONLY #
+#################################
+
+
 /**
  * get companies paginated
  */
@@ -252,6 +283,8 @@ $app->get("/company/all", function (Request $request, Response $response) {
     $response->getBody()->write(json_encode($error));
     return $response->withStatus(500);
   }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "admin");
 });
 
 /**
@@ -280,6 +313,41 @@ $app->put("/company/verify", function (Request $req, Response $response) {
     $response->getBody()->write(json_encode($error));
     return $response->withStatus(500);
   }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "admin");
+});
+
+/**
+ * get company profile
+ */
+$app->get("/company/get/{id}", function (Request $request, Response $response, array $args) {
+  try {
+    $companyId = $args['id'];
+
+    $db = new Database();
+    $conn = $db->connect();
+
+    $sql = "SELECT * FROM `companies` WHERE companyId = :companyId";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':companyId', htmlspecialchars(strip_tags($companyId)));
+    $stmt->execute();
+    $result = $stmt->fetch(PDO::FETCH_OBJ);
+    if (!$result) {
+      $response->getBody()->write(json_encode(["message" => "company does not exist"]));
+      return $response->withStatus(404);
+    }
+
+    $response->getBody()->write(json_encode($result));
+    return $response->withStatus(200);
+  } catch (PDOException $err) {
+    $error = array(
+      "message" => $err->getMessage()
+    );
+    $response->getBody()->write(json_encode($error));
+    return $response->withStatus(500);
+  }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "admin");
 });
 
 /**
@@ -318,4 +386,6 @@ $app->delete("/company/{id}", function (Request $request, Response $response, ar
     $response->getBody()->write(json_encode($error));
     return $response->withStatus(500);
   }
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "admin");
 });

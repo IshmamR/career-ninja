@@ -2,9 +2,6 @@
 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use Slim\Factory\AppFactory;
-
-// $app = AppFactory::create();
 
 $app->get('/test/all', function (Request $request, Response $response) {
   $sql = "SELECT * FROM tests";
@@ -36,4 +33,11 @@ $app->get('/test/all', function (Request $request, Response $response) {
 $app->get('/test/ping', function (Request $request, Response $response) {
   $response->getBody()->write("PONG");
   return $response->withHeader("Content-Type", "application/json");
+});
+
+$app->get('/test/admin/auth', function (Request $request, Response $response) {
+  $response->getBody()->write("PONG");
+  return $response->withHeader("Content-Type", "application/json");
+})->add(function ($req, $handler) use ($authMiddleware) {
+  return $authMiddleware($req, $handler, "admin");
 });
