@@ -21,8 +21,6 @@ $app->get("/circular/all", function (Request $request, Response $response) {
     // Calculate the offset for the current page
     $offset = ($page - 1) * $limit;
 
-    $companyId = $params['companyId'];
-
     $db = new Database();
     $conn = $db->connect();
 
@@ -38,16 +36,18 @@ $app->get("/circular/all", function (Request $request, Response $response) {
       WHERE 
         (circulars.title LIKE :title OR circulars.jobType LIKE :title)
         AND (NOT :companyId OR circulars.companyId = :companyId)
+        AND (NOT :fieldId OR circulars.fieldId = :fieldId)
       LIMIT :offset, :limit;";
 
-    if (isset($companyId) && $companyId !== "") {
-      $sql .= " WHERE companyId = $companyId";
-    }
+    $fieldId = isset($params['fieldId']) ? $params['fieldId'] : '';
+    $companyId = isset($params['companyId']) ? $params['companyId'] : '';
+
     $stmt = $conn->prepare($sql);
 
     // Bind the parameters
     $stmt->bindValue(':title', "%$title%", PDO::PARAM_STR);
-    $stmt->bindValue(':companyId', $companyId, PDO::PARAM_INT);
+    $stmt->bindValue(':companyId', $companyId, PDO::PARAM_STR);
+    $stmt->bindValue(':fieldId', $fieldId, PDO::PARAM_STR);
     $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
 

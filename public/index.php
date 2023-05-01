@@ -69,6 +69,7 @@ require_once __DIR__ . "/../middlewares/authenticator.php";
 //
 require __DIR__ . '/../routes/test.php';
 //
+require __DIR__ . '/../routes/applicant.php';
 require __DIR__ . '/../routes/admin.php';
 require __DIR__ . '/../routes/company.php';
 require __DIR__ . '/../routes/circular.php';

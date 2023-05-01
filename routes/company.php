@@ -162,7 +162,7 @@ $app->post("/company/login", function (Request $request, Response $response) {
 
     $result = $stmt->fetch(PDO::FETCH_OBJ);
 
-    // clean var
+    // close connection
     $db = null;
 
     if (!$result) {
@@ -381,8 +381,6 @@ $app->put("/company/update", function (Request $request, Response $response) {
     // Prepare and execute the query
     $stmt = $conn->prepare($sql);
     $stmt->execute($params);
-
-    $stmt->debugDumpParams();
 
     if ($stmt->rowCount() === 0) {
       $response->getBody()->write(json_encode(["message" => "No records were updated"]));
